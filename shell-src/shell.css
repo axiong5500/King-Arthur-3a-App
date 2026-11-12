@@ -1,0 +1,49 @@
+/* ============================================================
+   King-Arthur-3a · APP 横屏外壳（在原样式之后加载，只做覆盖，不改动原规则）
+   ============================================================ */
+
+html, body { overscroll-behavior: none; }
+html { -webkit-tap-highlight-color: transparent; }
+body { -webkit-touch-callout: none; }
+
+/* 移动端浏览器/WebView 的地址栏与手势条会让 100vh 溢出，用 dvh 兜住 */
+#app { height: 100vh; height: 100dvh; }
+
+/* ---------------- 竖屏守卫 ---------------- */
+#rot-guard {
+  position: fixed; left: 0; top: 0; right: 0; bottom: 0; z-index: 9998;
+  display: none; flex-direction: column; align-items: center; justify-content: center;
+  gap: 18px; text-align: center; color: #e8e4da;
+  font-family: 'PingFang SC', 'Microsoft YaHei', 'Noto Sans CJK SC', system-ui, sans-serif;
+  background: radial-gradient(120% 90% at 50% 42%, #1b2227 0%, #0d1215 55%, #050708 100%);
+  padding: calc(20px + env(safe-area-inset-top, 0px)) 24px calc(20px + env(safe-area-inset-bottom, 0px));
+}
+#rot-guard.on { display: flex; }
+
+.rg-mark { font-weight: 900; font-size: clamp(26px, 7vw, 52px); letter-spacing: .16em; line-height: 1; margin-right: -.16em; }
+.rg-mark i { font-style: normal; color: #ffb347; }
+
+.rg-phone { width: clamp(64px, 16vw, 92px); height: auto; display: block; transform-origin: 50% 50%; animation: rg-turn 2.8s ease-in-out infinite; }
+@keyframes rg-turn {
+  0%, 30% { transform: rotate(0deg); }
+  56%, 100% { transform: rotate(-90deg); }
+}
+@media (prefers-reduced-motion: reduce) { .rg-phone { animation: none; } }
+
+.rg-title { font-size: clamp(17px, 4.4vw, 22px); font-weight: 700; letter-spacing: .12em; margin-top: 2px; }
+.rg-sub { font-size: 13px; line-height: 1.75; color: rgba(232, 228, 218, .62); width: 100%; max-width: 32em; }
+.rg-go {
+  -webkit-appearance: none; appearance: none; cursor: pointer;
+  border: 1.5px solid rgba(255, 179, 71, .55); background: rgba(255, 179, 71, .12); color: #ffc977;
+  font: 600 15px/1 'PingFang SC', 'Microsoft YaHei', sans-serif; letter-spacing: .12em;
+  padding: 14px 22px; min-height: 46px; min-width: 200px; border-radius: 2px;
+  touch-action: manipulation;
+}
+.rg-go:active { background: rgba(255, 179, 71, .26); }
+.rg-tip { font-size: 12px; line-height: 1.7; letter-spacing: .04em; color: rgba(232, 228, 218, .38); width: 100%; max-width: 32em; }
+.rg-tip.warn { color: #ff9f7a; }
+
+/* 横屏矮屏（多数手机横屏只有 380~430px 高）：把暂停键缩小并让出刘海区 */
+@media (orientation: landscape) and (max-height: 460px) {
+  .t-pause { width: 40px; height: 40px; font-size: 11px; top: calc(8px + var(--sat)); right: calc(8px + var(--sar)); }
+}
