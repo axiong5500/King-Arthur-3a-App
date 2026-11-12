@@ -1,21 +1,22 @@
-# 构建脚本：把外壳补丁注入桌面版 index.html，生成 APP 横屏版
-# 用法：
-#   pwsh ./build.ps1 -BaseHtml ../King-Arthur-3a/index.html -OutHtml ./index.html
-# 说明：
-#   - 补丁只做两处追加：</head> 前插入 <style id="ka-app-shell">，</body> 前插入竖屏守卫与外壳脚本
-#   - 每次都从原版重新注入，不会叠加补丁；原文件的其余字节保持不变
+# 构建 King-Arthur-3a-App（APP 横屏版）
+# 用法：pwsh build.ps1
+# 逻辑：读取原版 index.html，把 shell.css / guard.html / shell.js 注入到固定锚点，
+#       原文件其余字节保持不变；每次重建都从原版重新注入，避免补丁叠加。
 
 param(
-  [Parameter(Mandatory = $true)][string]$BaseHtml,
-  [string]$OutHtml = (Join-Path (Split-Path -Parent $PSScriptRoot) 'index.html')
+  [string]$Root = (Split-Path -Parent $PSScriptRoot)
 )
 
 $ErrorActionPreference = 'Stop'
-foreach ($p in @($BaseHtml, (Join-Path $PSScriptRoot 'shell.css'), (Join-Path $PSScriptRoot 'guard.html'), (Join-Path $PSScriptRoot 'shell.js'))) {
+$base   = Join-Path $Root 'King-Arthur-3a\index.html'
+$outDir = Join-Path $Root 'King-Arthur-3a-App'
+$outFile = Join-Path $outDir 'index.html'
+
+foreach ($p in @($base, (Join-Path $PSScriptRoot 'shell.css'), (Join-Path $PSScriptRoot 'guard.html'), (Join-Path $PSScriptRoot 'shell.js'))) {
   if (-not (Test-Path -LiteralPath $p)) { throw "缺少文件：$p" }
 }
 
-$t = [IO.File]::ReadAllText($BaseHtml)
+$t = [IO.File]::ReadAllText($base)
 if (([regex]::Matches($t, '</head>')).Count -ne 1) { throw '原文件中 </head> 不唯一，停止注入' }
 if (([regex]::Matches($t, '</body>')).Count -ne 1) { throw '原文件中 </body> 不唯一，停止注入' }
 
@@ -26,13 +27,26 @@ $js        = [IO.File]::ReadAllText((Join-Path $PSScriptRoot 'shell.js'))
 $styleBlock = "`n<style id=`"ka-app-shell`">`n" + $css + "`n</style>`n</head>"
 $guardBlock = "`n" + $guardHtml + "`n<script id=`"ka-app-shell-js`">`n" + $js + "`n</script>`n</body>"
 
-$n = $t.Replace('<title>亚瑟3A大作</title>', '<title>亚瑟3A大作 · 横屏版</title>')
+# 标题：加「· 横屏版」标记，幂等（已有标记则不动）
+$origTitle = [regex]::Match($t, '(?<=<title>)[^<]*(?=</title>)').Value
+if (-not $origTitle) { throw '原文件中未找到 <title>' }
+$newTitle = if ($origTitle -like '*· 横屏版') { $origTitle } else { "$origTitle · 横屏版" }
+$n = [regex]::Replace($t, '<title>[^<]*</title>', "<title>$newTitle</title>", 1)
 $n = $n.Replace('</head>', $styleBlock)
 $n = $n.Replace('</body>', $guardBlock)
 
-[IO.File]::WriteAllText($OutHtml, $n, (New-Object Text.UTF8Encoding($false)))
+if (-not (Test-Path -LiteralPath $outDir)) { New-Item -ItemType Directory -Path $outDir | Out-Null }
+[IO.File]::WriteAllText($outFile, $n, (New-Object Text.UTF8Encoding($false)))
 
-"标题已加横屏标记： " + $n.Contains('横屏版</title>')
-"原文件字符数： $($t.Length)"
-"输出字符数：   $($n.Length)（插入 $($n.Length - $t.Length)）"
-"输出： $OutHtml"
+# 自检：补丁齐全、原内容零损伤
+$checks = [ordered]@{
+  '亚瑟出现次数'         = ([regex]::Matches($n, '亚瑟').Count)
+  '亚瑟王中王出现次数'   = ([regex]::Matches($n, '亚瑟王中王').Count)
+  '几猫出现次数'         = ([regex]::Matches($n, '几猫').Count)
+  '外壳样式'             = $n.Contains('ka-app-shell')
+  '竖屏守卫'             = $n.Contains('id="rot-guard"')
+  '外壳脚本'             = $n.Contains('__appShell')
+  '插入字符数'           = $n.Length - $t.Length
+}
+$checks.GetEnumerator() | ForEach-Object { "{0}: {1}" -f $_.Key, $_.Value }
+"输出：$outFile ($((Get-Item -LiteralPath $outFile).Length) 字节)"
